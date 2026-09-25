@@ -1,0 +1,28 @@
+FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+WORKDIR /app
+
+# Install dependencies first (layer caching)
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --no-dev
+
+# Copy app code into a package subfolder (keeps relative imports working)
+COPY . ./app
+
+RUN touch ./app/__init__.py
+
+RUN uv sync --frozen --no-dev
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+RUN useradd -m appuser && chown -R appuser /app
+USER appuser
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
